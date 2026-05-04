@@ -68,6 +68,9 @@ public final class TerminalView extends View {
 
     /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
     int mTopRow;
+    /** Sub-row pixel offset for smooth scrolling. Range: [0, mFontLineSpacing). 0 means row-aligned.
+     * The viewport is shifted toward newer content by this many pixels past mTopRow. */
+    int mTopRowPixelOffset;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
 
     float mScaleFactor = 1.f;
@@ -177,10 +180,19 @@ public final class TerminalView extends View {
                     sendMouseEventCode(e, TerminalEmulator.MOUSE_LEFT_BUTTON_MOVED, true);
                 } else {
                     scrolledWithFinger = true;
-                    distanceY += mScrollRemainder;
-                    int deltaRows = (int) (distanceY / mRenderer.mFontLineSpacing);
-                    mScrollRemainder = distanceY - deltaRows * mRenderer.mFontLineSpacing;
-                    doScroll(e, deltaRows);
+                    if (mEmulator.isMouseTrackingActive() || mEmulator.isAlternateBufferActive()) {
+                        // Mouse-wheel events and alt-screen DPAD events only support row granularity.
+                        distanceY += mScrollRemainder;
+                        int deltaRows = (int) (distanceY / mRenderer.mFontLineSpacing);
+                        mScrollRemainder = distanceY - deltaRows * mRenderer.mFontLineSpacing;
+                        doScroll(e, deltaRows);
+                    } else {
+                        // Scrollback view supports per-pixel scrolling.
+                        distanceY += mScrollRemainder;
+                        int deltaPixels = (int) distanceY;
+                        mScrollRemainder = distanceY - deltaPixels;
+                        scrollByPixels(deltaPixels);
+                    }
                 }
                 return true;
             }
@@ -200,15 +212,25 @@ public final class TerminalView extends View {
                 if (!mScroller.isFinished()) return true;
 
                 final boolean mouseTrackingAtStartOfFling = mEmulator.isMouseTrackingActive();
-                float SCALE = 0.25f;
+                final boolean rowFling = mouseTrackingAtStartOfFling || mEmulator.isAlternateBufferActive();
+                final float SCALE = 0.25f;
+                final int initialY;
                 if (mouseTrackingAtStartOfFling) {
+                    initialY = 0;
                     mScroller.fling(0, 0, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.mRows / 2, mEmulator.mRows / 2);
-                } else {
+                } else if (rowFling) {
+                    initialY = mTopRow;
                     mScroller.fling(0, mTopRow, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.getScreen().getActiveTranscriptRows(), 0);
+                } else {
+                    final int lineSpacing = mRenderer.mFontLineSpacing;
+                    initialY = mTopRow * lineSpacing + mTopRowPixelOffset;
+                    // Original SCALE was tuned for row-granularity fling; scale by lineSpacing to preserve feel in pixel units.
+                    mScroller.fling(0, initialY, 0, -(int) (velocityY * SCALE * lineSpacing), 0, 0,
+                        -mEmulator.getScreen().getActiveTranscriptRows() * lineSpacing, 0);
                 }
 
                 post(new Runnable() {
-                    private int mLastY = 0;
+                    private int mLastY = initialY;
 
                     @Override
                     public void run() {
@@ -219,8 +241,13 @@ public final class TerminalView extends View {
                         if (mScroller.isFinished()) return;
                         boolean more = mScroller.computeScrollOffset();
                         int newY = mScroller.getCurrY();
-                        int diff = mouseTrackingAtStartOfFling ? (newY - mLastY) : (newY - mTopRow);
-                        doScroll(e2, diff);
+                        if (rowFling) {
+                            int diff = mouseTrackingAtStartOfFling ? (newY - mLastY) : (newY - mTopRow);
+                            doScroll(e2, diff);
+                        } else {
+                            int diff = newY - mLastY;
+                            if (diff != 0) scrollByPixels(diff);
+                        }
                         mLastY = newY;
                         if (more) post(this);
                     }
@@ -290,6 +317,7 @@ public final class TerminalView extends View {
     public boolean attachSession(TerminalSession session) {
         if (session == mTermSession) return false;
         mTopRow = 0;
+        mTopRowPixelOffset = 0;
 
         mTermSession = session;
         mEmulator = null;
@@ -437,17 +465,21 @@ public final class TerminalView extends View {
 
     @Override
     protected int computeVerticalScrollRange() {
-        return mEmulator == null ? 1 : mEmulator.getScreen().getActiveRows();
+        if (mEmulator == null) return 1;
+        return mEmulator.getScreen().getActiveRows() * mRenderer.mFontLineSpacing;
     }
 
     @Override
     protected int computeVerticalScrollExtent() {
-        return mEmulator == null ? 1 : mEmulator.mRows;
+        if (mEmulator == null) return 1;
+        return mEmulator.mRows * mRenderer.mFontLineSpacing;
     }
 
     @Override
     protected int computeVerticalScrollOffset() {
-        return mEmulator == null ? 1 : mEmulator.getScreen().getActiveRows() + mTopRow - mEmulator.mRows;
+        if (mEmulator == null) return 1;
+        return (mEmulator.getScreen().getActiveRows() + mTopRow - mEmulator.mRows) * mRenderer.mFontLineSpacing
+            + mTopRowPixelOffset;
     }
 
     public void onScreenUpdated() {
@@ -458,7 +490,10 @@ public final class TerminalView extends View {
         if (mEmulator == null) return;
 
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
-        if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
+        if (mTopRow < -rowsInHistory) {
+            mTopRow = -rowsInHistory;
+            mTopRowPixelOffset = 0;
+        }
 
         if (isSelectingText() || mEmulator.isAutoScrollDisabled()) {
 
@@ -472,6 +507,7 @@ public final class TerminalView extends View {
 
                 if (mEmulator.isAutoScrollDisabled()) {
                     mTopRow = -rowsInHistory;
+                    mTopRowPixelOffset = 0;
                     skipScrolling = true;
                 }
             } else {
@@ -481,7 +517,7 @@ public final class TerminalView extends View {
             }
         }
 
-        if (!skipScrolling && mTopRow != 0) {
+        if (!skipScrolling && (mTopRow != 0 || mTopRowPixelOffset != 0)) {
             // Scroll down if not already there.
             if (mTopRow < -3) {
                 // Awaken scroll bars only if scrolling a noticeable amount
@@ -490,6 +526,7 @@ public final class TerminalView extends View {
                 awakenScrollBars();
             }
             mTopRow = 0;
+            mTopRowPixelOffset = 0;
         }
 
         mEmulator.clearScrollCounter();
@@ -545,7 +582,7 @@ public final class TerminalView extends View {
      */
     public int[] getColumnAndRow(MotionEvent event, boolean relativeToScroll) {
         int column = (int) (event.getX() / mRenderer.mFontWidth);
-        int row = (int) ((event.getY() - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);
+        int row = (int) ((event.getY() + mTopRowPixelOffset - mRenderer.mFontLineSpacingAndAscent) / mRenderer.mFontLineSpacing);
         if (relativeToScroll) {
             row += mTopRow;
         }
@@ -583,9 +620,25 @@ public final class TerminalView extends View {
                 handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
             } else {
                 mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
+                mTopRowPixelOffset = 0;
                 if (!awakenScrollBars()) invalidate();
             }
         }
+    }
+
+    /** Scroll the scrollback viewport by an arbitrary pixel amount. Positive = toward newer content. */
+    private void scrollByPixels(int dy) {
+        if (dy == 0) return;
+        final int lineSpacing = mRenderer.mFontLineSpacing;
+        final int transcriptRows = mEmulator.getScreen().getActiveTranscriptRows();
+        long totalPixels = (long) mTopRow * lineSpacing + mTopRowPixelOffset + dy;
+        final long minPixels = -(long) transcriptRows * lineSpacing;
+        if (totalPixels > 0) totalPixels = 0;
+        if (totalPixels < minPixels) totalPixels = minPixels;
+        long newTopRow = Math.floorDiv(totalPixels, (long) lineSpacing);
+        mTopRow = (int) newTopRow;
+        mTopRowPixelOffset = (int) (totalPixels - newTopRow * lineSpacing);
+        if (!awakenScrollBars()) invalidate();
     }
 
     /** Overriding {@link View#onGenericMotionEvent(MotionEvent)}. */
@@ -1000,6 +1053,7 @@ public final class TerminalView extends View {
                 mTerminalCursorBlinkerRunnable.setEmulator(mEmulator);
 
             mTopRow = 0;
+            mTopRowPixelOffset = 0;
             scrollTo(0, 0);
             invalidate();
         }
@@ -1016,7 +1070,7 @@ public final class TerminalView extends View {
                 mTextSelectionCursorController.getSelectors(sel);
             }
 
-            mRenderer.render(mEmulator, canvas, mTopRow, sel[0], sel[1], sel[2], sel[3]);
+            mRenderer.render(mEmulator, canvas, mTopRow, mTopRowPixelOffset, sel[0], sel[1], sel[2], sel[3]);
 
             // render the text selection handles
             renderTextSelection();
@@ -1036,7 +1090,7 @@ public final class TerminalView extends View {
     }
 
     public int getCursorY(float y) {
-        return (int) (((y - 40) / mRenderer.mFontLineSpacing) + mTopRow);
+        return (int) (((y + mTopRowPixelOffset - 40) / mRenderer.mFontLineSpacing) + mTopRow);
     }
 
     public int getPointX(int cx) {
@@ -1047,7 +1101,7 @@ public final class TerminalView extends View {
     }
 
     public int getPointY(int cy) {
-        return Math.round((cy - mTopRow) * mRenderer.mFontLineSpacing);
+        return Math.round((cy - mTopRow) * mRenderer.mFontLineSpacing) - mTopRowPixelOffset;
     }
 
     public int getTopRow() {
@@ -1056,6 +1110,7 @@ public final class TerminalView extends View {
 
     public void setTopRow(int mTopRow) {
         this.mTopRow = mTopRow;
+        this.mTopRowPixelOffset = 0;
     }
 
 

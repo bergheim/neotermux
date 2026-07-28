@@ -1,0 +1,8 @@
+#+title: Tasks
+#+date: [2026-07-28 Tue]
+
+* INPROGRESS Enable swipe typing in the terminal  :autonomous:
+:PROPERTIES:
+:ID:       20260728T164500Z-88a60f
+:END:
+Implement a swipe-capable composing IME mode enabled by default, retain raw terminal input as a settings fallback, and verify terminal input regressions.

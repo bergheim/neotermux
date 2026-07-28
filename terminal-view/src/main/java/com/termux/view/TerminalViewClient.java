@@ -32,7 +32,9 @@ public interface TerminalViewClient {
 
     boolean shouldEnforceCharBasedInput();
 
-    boolean shouldUseSwipeTyping();
+    default boolean shouldUseSwipeTyping() {
+        return false;
+    }
 
     boolean shouldUseCtrlSpaceWorkaround();
 

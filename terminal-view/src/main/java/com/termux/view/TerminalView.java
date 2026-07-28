@@ -353,6 +353,7 @@ public final class TerminalView extends View {
             @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
+                // BaseInputConnection removes the composing span but keeps its text in the editable.
                 super.finishComposingText();
 
                 sendTextToTerminal(getEditable());
@@ -365,6 +366,7 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: commitText(\"" + text + "\", " + newCursorPosition + ")");
                 }
+                // This replaces any composing span, leaving the complete commit in the editable.
                 super.commitText(text, newCursorPosition);
 
                 if (mEmulator == null) return true;
@@ -408,6 +410,8 @@ public final class TerminalView extends View {
 
                 KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
                 for (int i = 0; i < terminalBackspaceCount; i++) sendKeyEvent(deleteKey);
+                // The platform implementation deletes code points directly; it does not delegate
+                // to deleteSurroundingText(), so terminal backspaces are not dispatched twice.
                 return super.deleteSurroundingTextInCodePoints(leftLength, rightLength);
             }
 

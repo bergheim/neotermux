@@ -13,7 +13,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.Editable;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.ActionMode;
@@ -333,38 +332,21 @@ public final class TerminalView extends View {
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        boolean terminalSelected = mClient.isTerminalViewSelected();
+        boolean swipeTypingEnabled = terminalSelected && mClient.shouldUseSwipeTyping();
+
         // Ensure that inputType is only set if TerminalView is selected view with the keyboard and
         // an alternate view is not selected, like an EditText. This is necessary if an activity is
         // initially started with the alternate view or if activity is returned to from another app
         // and the alternate view was the one selected the last time.
-        if (mClient.isTerminalViewSelected()) {
-            if (mClient.shouldEnforceCharBasedInput()) {
-                // Some keyboards seems do not reset the internal state on TYPE_NULL.
-                // Affects mostly Samsung stock keyboards.
-                // https://github.com/termux/termux-app/issues/686
-                // However, this is not a valid value as per AOSP since `InputType.TYPE_CLASS_*` is
-                // not set and it logs a warning:
-                // W/InputAttributes: Unexpected input class: inputType=0x00080090 imeOptions=0x02000000
-                // https://cs.android.com/android/platform/superproject/+/android-11.0.0_r40:packages/inputmethods/LatinIME/java/src/com/android/inputmethod/latin/InputAttributes.java;l=79
-                outAttrs.inputType = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
-            } else {
-                // Using InputType.NULL is the most correct input type and avoids issues with other hacks.
-                //
-                // Previous keyboard issues:
-                // https://github.com/termux/termux-packages/issues/25
-                // https://github.com/termux/termux-app/issues/87.
-                // https://github.com/termux/termux-app/issues/126.
-                // https://github.com/termux/termux-app/issues/137 (japanese chars and TYPE_NULL).
-                outAttrs.inputType = InputType.TYPE_NULL;
-            }
-        } else {
-            // Corresponds to android:inputType="text"
-            outAttrs.inputType =  InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_NORMAL;
-        }
+        outAttrs.inputType = TerminalImeUtils.getInputType(terminalSelected, swipeTypingEnabled,
+            mClient.shouldEnforceCharBasedInput());
 
         // Note that IME_ACTION_NONE cannot be used as that makes it impossible to input newlines using the on-screen
         // keyboard on Android TV (see https://github.com/termux/termux-app/issues/221).
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN;
+        outAttrs.imeOptions = TerminalImeUtils.getImeOptions(swipeTypingEnabled, Build.VERSION.SDK_INT);
+        outAttrs.initialSelStart = 0;
+        outAttrs.initialSelEnd = 0;
 
         return new BaseInputConnection(this, true) {
 
@@ -398,10 +380,35 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
+                Editable content = getEditable();
+                int bufferedLength = content == null ? 0 : Math.max(0, android.text.Selection.getSelectionStart(content));
+                int terminalBackspaceCount = TerminalImeUtils.getTerminalBackspaceCount(leftLength,
+                    bufferedLength, mClient.shouldUseSwipeTyping());
+
                 // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
                 KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < leftLength; i++) sendKeyEvent(deleteKey);
+                for (int i = 0; i < terminalBackspaceCount; i++) sendKeyEvent(deleteKey);
                 return super.deleteSurroundingText(leftLength, rightLength);
+            }
+
+            @Override
+            @TargetApi(Build.VERSION_CODES.N)
+            public boolean deleteSurroundingTextInCodePoints(int leftLength, int rightLength) {
+                if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
+                    mClient.logInfo(LOG_TAG, "IME: deleteSurroundingTextInCodePoints(" +
+                        leftLength + ", " + rightLength + ")");
+                }
+                Editable content = getEditable();
+                int selectionStart = content == null ? 0 : Math.max(0,
+                    android.text.Selection.getSelectionStart(content));
+                int bufferedCodePoints = TerminalImeUtils.getCodePointCountBeforeCursor(content,
+                    selectionStart);
+                int terminalBackspaceCount = TerminalImeUtils.getTerminalBackspaceCount(leftLength,
+                    bufferedCodePoints, mClient.shouldUseSwipeTyping());
+
+                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
+                for (int i = 0; i < terminalBackspaceCount; i++) sendKeyEvent(deleteKey);
+                return super.deleteSurroundingTextInCodePoints(leftLength, rightLength);
             }
 
             void sendTextToTerminal(CharSequence text) {

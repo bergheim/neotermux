@@ -78,6 +78,13 @@ public class KeyboardUtils {
             inputMethodManager.hideSoftInputFromWindow(view.getWindowToken(), 0);
     }
 
+    public static void restartInput(final Context context, final View view) {
+        if (context == null || view == null) return;
+        InputMethodManager inputMethodManager = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (inputMethodManager != null)
+            inputMethodManager.restartInput(view);
+    }
+
     public static void disableSoftKeyboard(final Activity activity, final View view) {
         if (activity == null || view == null) return;
         hideSoftKeyboard(activity, view);

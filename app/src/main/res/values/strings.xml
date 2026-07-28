@@ -176,6 +176,13 @@
             <!-- Keyboard Category -->
             <string name="termux_keyboard_header">Keyboard</string>
 
+                <!-- Swipe Typing -->
+                <string name="termux_swipe_typing_enabled_title">Swipe and Predictive Typing</string>
+                <string name="termux_swipe_typing_enabled_off">Use raw terminal input. Swipe typing and suggestions may be unavailable.</string>
+                <string name="termux_swipe_typing_enabled_on">Allow the keyboard to compose, correct, and swipe text. Disable before entering sensitive text if your keyboard may retain input. (Default)</string>
+                <string name="msg_swipe_typing_enabled">Swipe typing enabled</string>
+                <string name="msg_swipe_typing_disabled">Raw terminal input enabled</string>
+
                 <!-- Soft Keyboard -->
                 <string name="termux_soft_keyboard_enabled_title">Soft Keyboard Enabled</string>
                 <string name="termux_soft_keyboard_enabled_off">Soft keyboard will be disabled.</string>

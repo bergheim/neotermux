@@ -1,7 +1,7 @@
 package com.termux.shared.termux.settings.preferences;
 
 /*
- * Version: v0.16.0
+ * Version: v0.17.0
  *
  * Changelog
  *
@@ -69,6 +69,9 @@ package com.termux.shared.termux.settings.preferences;
  * - 0.16.0 (2022-06-11)
  *      - Added following to `TERMUX_APP`:
  *          `KEY_APP_SHELL_NUMBER_SINCE_BOOT` and `KEY_TERMINAL_SESSION_NUMBER_SINCE_BOOT`.
+ *
+ * - 0.17.0 (2026-07-28)
+ *      - Added `TERMUX_APP.KEY_SWIPE_TYPING_ENABLED`.
  */
 
 import com.termux.shared.shell.command.ExecutionCommand;
@@ -116,6 +119,10 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_SOFT_KEYBOARD_ENABLED_ONLY_IF_NO_HARDWARE = "soft_keyboard_enabled_only_if_no_hardware";
         public static final boolean DEFAULT_VALUE_KEY_SOFT_KEYBOARD_ENABLED_ONLY_IF_NO_HARDWARE = false;
+
+        /** Defines whether the terminal requests composing text input for swipe-capable keyboards. */
+        public static final String KEY_SWIPE_TYPING_ENABLED = "swipe_typing_enabled";
+        public static final boolean DEFAULT_VALUE_SWIPE_TYPING_ENABLED = true;
 
 
         /**

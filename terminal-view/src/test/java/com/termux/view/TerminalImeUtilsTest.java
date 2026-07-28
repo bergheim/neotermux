@@ -42,14 +42,34 @@ public class TerminalImeUtilsTest {
 
     @Test
     public void compositionDeletesBufferedTextBeforeTerminalText() {
-        Assert.assertEquals(0, TerminalImeUtils.getTerminalBackspaceCount(1, 5, true));
-        Assert.assertEquals(2, TerminalImeUtils.getTerminalBackspaceCount(4, 2, true));
-        Assert.assertEquals(4, TerminalImeUtils.getTerminalBackspaceCount(4, 2, false));
+        Assert.assertEquals(0, TerminalImeUtils.getTerminalDeleteCount(1, 5, true));
+        Assert.assertEquals(2, TerminalImeUtils.getTerminalDeleteCount(4, 2, true));
+        Assert.assertEquals(4, TerminalImeUtils.getTerminalDeleteCount(4, 2, false));
     }
 
     @Test
-    public void bufferedCodePointCountTreatsSurrogatePairAsOneCharacter() {
-        Assert.assertEquals(2, TerminalImeUtils.getCodePointCountBeforeCursor("a\uD83D\uDE00b", 3));
-        Assert.assertEquals(3, TerminalImeUtils.getCodePointCountBeforeCursor("a\uD83D\uDE00b", 4));
+    public void composingSpanIsExcludedFromSurroundingDeleteCounts() {
+        Assert.assertEquals(0, TerminalImeUtils.getBufferedCountBeforeDelete(
+            "hello", 5, 5, 0, 5, false));
+        Assert.assertEquals(0, TerminalImeUtils.getBufferedCountAfterDelete(
+            "hello", 5, 5, 0, 5, false));
+        Assert.assertEquals(1, TerminalImeUtils.getBufferedCountBeforeDelete(
+            "ahellob", 6, 6, 1, 6, false));
+        Assert.assertEquals(1, TerminalImeUtils.getBufferedCountAfterDelete(
+            "ahellob", 6, 6, 1, 6, false));
+    }
+
+    @Test
+    public void bufferedDeleteCountsSupportCodePointsAndReversedSpans() {
+        String text = "a\uD83D\uDE00b";
+
+        Assert.assertEquals(2, TerminalImeUtils.getBufferedCountBeforeDelete(
+            text, 3, 3, -1, -1, true));
+        Assert.assertEquals(1, TerminalImeUtils.getBufferedCountAfterDelete(
+            text, 3, 3, -1, -1, true));
+        Assert.assertEquals(1, TerminalImeUtils.getBufferedCountBeforeDelete(
+            text, 3, 3, 3, 1, true));
+        Assert.assertEquals(1, TerminalImeUtils.getBufferedCountAfterDelete(
+            text, 3, 3, 3, 1, true));
     }
 }

@@ -31,6 +31,7 @@ import android.view.autofill.AutofillValue;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Scroller;
 
 import androidx.annotation.Nullable;
@@ -324,6 +325,10 @@ public final class TerminalView extends View {
 
         updateSize();
 
+        InputMethodManager inputMethodManager = (InputMethodManager)
+            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (inputMethodManager != null) inputMethodManager.restartInput(this);
+
         // Wait with enabling the scrollbar until we have a terminal to get scroll position from.
         setVerticalScrollBarEnabled(true);
 
@@ -334,6 +339,7 @@ public final class TerminalView extends View {
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
         boolean terminalSelected = mClient.isTerminalViewSelected();
         boolean swipeTypingEnabled = terminalSelected && mClient.shouldUseSwipeTyping();
+        final TerminalSession inputSession = mTermSession;
 
         // Ensure that inputType is only set if TerminalView is selected view with the keyboard and
         // an alternate view is not selected, like an EditText. This is necessary if an activity is
@@ -351,13 +357,21 @@ public final class TerminalView extends View {
         return new BaseInputConnection(this, true) {
 
             @Override
+            public boolean sendKeyEvent(KeyEvent event) {
+                if (inputSession == null || inputSession != mTermSession || mEmulator == null)
+                    return false;
+                return super.sendKeyEvent(event);
+            }
+
+            @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
                 // BaseInputConnection removes the composing span but keeps its text in the editable.
                 super.finishComposingText();
 
-                sendTextToTerminal(getEditable());
-                getEditable().clear();
+                Editable content = getEditable();
+                sendTextToTerminal(content);
+                content.clear();
                 return true;
             }
 
@@ -368,8 +382,6 @@ public final class TerminalView extends View {
                 }
                 // This replaces any composing span, leaving the complete commit in the editable.
                 super.commitText(text, newCursorPosition);
-
-                if (mEmulator == null) return true;
 
                 Editable content = getEditable();
                 sendTextToTerminal(content);
@@ -383,13 +395,22 @@ public final class TerminalView extends View {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
                 Editable content = getEditable();
-                int bufferedLength = content == null ? 0 : Math.max(0, android.text.Selection.getSelectionStart(content));
-                int terminalBackspaceCount = TerminalImeUtils.getTerminalBackspaceCount(leftLength,
-                    bufferedLength, mClient.shouldUseSwipeTyping());
+                int selectionStart = content == null ? -1 : android.text.Selection.getSelectionStart(content);
+                int selectionEnd = content == null ? -1 : android.text.Selection.getSelectionEnd(content);
+                int composingStart = content == null ? -1 : BaseInputConnection.getComposingSpanStart(content);
+                int composingEnd = content == null ? -1 : BaseInputConnection.getComposingSpanEnd(content);
+                int bufferedBefore = TerminalImeUtils.getBufferedCountBeforeDelete(content,
+                    selectionStart, selectionEnd, composingStart, composingEnd, false);
+                int bufferedAfter = TerminalImeUtils.getBufferedCountAfterDelete(content,
+                    selectionStart, selectionEnd, composingStart, composingEnd, false);
 
-                // The stock Samsung keyboard with 'Auto check spelling' enabled sends leftLength > 1.
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < terminalBackspaceCount; i++) sendKeyEvent(deleteKey);
+                // The stock Samsung keyboard with 'Auto check spelling' enabled sends lengths > 1.
+                sendDeleteKeyEvents(KeyEvent.KEYCODE_DEL, TerminalImeUtils.getTerminalDeleteCount(
+                    leftLength, bufferedBefore, mClient.shouldUseSwipeTyping()));
+                if (mClient.shouldUseSwipeTyping()) {
+                    sendDeleteKeyEvents(KeyEvent.KEYCODE_FORWARD_DEL,
+                        TerminalImeUtils.getTerminalDeleteCount(rightLength, bufferedAfter, true));
+                }
                 return super.deleteSurroundingText(leftLength, rightLength);
             }
 
@@ -401,21 +422,36 @@ public final class TerminalView extends View {
                         leftLength + ", " + rightLength + ")");
                 }
                 Editable content = getEditable();
-                int selectionStart = content == null ? 0 : Math.max(0,
-                    android.text.Selection.getSelectionStart(content));
-                int bufferedCodePoints = TerminalImeUtils.getCodePointCountBeforeCursor(content,
-                    selectionStart);
-                int terminalBackspaceCount = TerminalImeUtils.getTerminalBackspaceCount(leftLength,
-                    bufferedCodePoints, mClient.shouldUseSwipeTyping());
+                int selectionStart = content == null ? -1 : android.text.Selection.getSelectionStart(content);
+                int selectionEnd = content == null ? -1 : android.text.Selection.getSelectionEnd(content);
+                int composingStart = content == null ? -1 : BaseInputConnection.getComposingSpanStart(content);
+                int composingEnd = content == null ? -1 : BaseInputConnection.getComposingSpanEnd(content);
+                int bufferedBefore = TerminalImeUtils.getBufferedCountBeforeDelete(content,
+                    selectionStart, selectionEnd, composingStart, composingEnd, true);
+                int bufferedAfter = TerminalImeUtils.getBufferedCountAfterDelete(content,
+                    selectionStart, selectionEnd, composingStart, composingEnd, true);
 
-                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL);
-                for (int i = 0; i < terminalBackspaceCount; i++) sendKeyEvent(deleteKey);
+                sendDeleteKeyEvents(KeyEvent.KEYCODE_DEL, TerminalImeUtils.getTerminalDeleteCount(
+                    leftLength, bufferedBefore, mClient.shouldUseSwipeTyping()));
+                if (mClient.shouldUseSwipeTyping()) {
+                    sendDeleteKeyEvents(KeyEvent.KEYCODE_FORWARD_DEL,
+                        TerminalImeUtils.getTerminalDeleteCount(rightLength, bufferedAfter, true));
+                }
                 // The platform implementation deletes code points directly; it does not delegate
                 // to deleteSurroundingText(), so terminal backspaces are not dispatched twice.
                 return super.deleteSurroundingTextInCodePoints(leftLength, rightLength);
             }
 
+            void sendDeleteKeyEvents(int keyCode, int count) {
+                KeyEvent deleteKey = new KeyEvent(KeyEvent.ACTION_DOWN, keyCode);
+                for (int i = 0; i < count; i++) sendKeyEvent(deleteKey);
+            }
+
             void sendTextToTerminal(CharSequence text) {
+                // A closing connection may outlive a session switch. Never inject its buffered
+                // composition into the terminal session that replaced the one it was created for.
+                if (inputSession == null || inputSession != mTermSession || mEmulator == null) return;
+
                 stopTextSelectionMode();
                 final int textLengthInChars = text.length();
                 for (int i = 0; i < textLengthInChars; i++) {

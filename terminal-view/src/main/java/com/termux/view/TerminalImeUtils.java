@@ -38,15 +38,48 @@ final class TerminalImeUtils {
         return options;
     }
 
-    static int getTerminalBackspaceCount(int requestedLength, int bufferedLength,
-                                         boolean swipeTypingEnabled) {
+    static int getTerminalDeleteCount(int requestedLength, int bufferedLength,
+                                      boolean swipeTypingEnabled) {
         if (!swipeTypingEnabled) return requestedLength;
         return Math.max(0, requestedLength - Math.max(0, bufferedLength));
     }
 
-    static int getCodePointCountBeforeCursor(CharSequence text, int cursor) {
-        if (text == null || cursor <= 0) return 0;
-        int boundedCursor = Math.min(cursor, text.length());
-        return Character.codePointCount(text, 0, boundedCursor);
+    static int getBufferedCountBeforeDelete(CharSequence text, int selectionStart,
+                                            int selectionEnd, int composingStart,
+                                            int composingEnd, boolean codePoints) {
+        int boundary = getDeleteBoundaries(text, selectionStart, selectionEnd,
+            composingStart, composingEnd)[0];
+        return getCount(text, 0, boundary, codePoints);
+    }
+
+    static int getBufferedCountAfterDelete(CharSequence text, int selectionStart,
+                                           int selectionEnd, int composingStart,
+                                           int composingEnd, boolean codePoints) {
+        int boundary = getDeleteBoundaries(text, selectionStart, selectionEnd,
+            composingStart, composingEnd)[1];
+        return getCount(text, boundary, text == null ? 0 : text.length(), codePoints);
+    }
+
+    private static int[] getDeleteBoundaries(CharSequence text, int selectionStart,
+                                             int selectionEnd, int composingStart,
+                                             int composingEnd) {
+        int textLength = text == null ? 0 : text.length();
+        if (selectionStart < 0 || selectionEnd < 0) return new int[]{0, textLength};
+
+        int start = Math.min(selectionStart, selectionEnd);
+        int end = Math.max(selectionStart, selectionEnd);
+        if (composingStart >= 0 && composingEnd >= 0) {
+            start = Math.min(start, Math.min(composingStart, composingEnd));
+            end = Math.max(end, Math.max(composingStart, composingEnd));
+        }
+
+        start = Math.max(0, Math.min(start, textLength));
+        end = Math.max(start, Math.min(end, textLength));
+        return new int[]{start, end};
+    }
+
+    private static int getCount(CharSequence text, int start, int end, boolean codePoints) {
+        if (text == null || end <= start) return 0;
+        return codePoints ? Character.codePointCount(text, start, end) : end - start;
     }
 }

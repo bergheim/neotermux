@@ -1,11 +1,12 @@
 #+title: Tasks
 #+date: [2026-07-28 Tue]
 
-* WAITING Enable swipe typing in the terminal                    :autonomous:
+* INPROGRESS Enable swipe typing in the terminal                 :autonomous:
 :PROPERTIES:
 :ID:       20260728T164500Z-88a60f
 :END:
 :LOGBOOK:
+- State "INPROGRESS" from "WAITING"    [2026-07-29 Wed 17:32]
 - State "WAITING"    from "INPROGRESS" [2026-07-29 Wed 12:07] \\
   SwiftKey compatibility fix 0b82a45e passed focused tests and all protected GitHub checks; CI-built ARM64 APK published for user device verification.
 - State "INPROGRESS" from "DONE"       [2026-07-29 Wed 12:02]

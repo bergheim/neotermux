@@ -8,6 +8,56 @@ final class TerminalImeUtils {
     private TerminalImeUtils() {
     }
 
+    static final class ExtractedTextSnapshot {
+        final String text;
+        final int startOffset;
+        final int partialStartOffset;
+        final int partialEndOffset;
+        final int selectionStart;
+        final int selectionEnd;
+
+        ExtractedTextSnapshot(String text, int selectionStart, int selectionEnd) {
+            this.text = text;
+            this.startOffset = 0;
+            this.partialStartOffset = -1;
+            this.partialEndOffset = -1;
+            this.selectionStart = selectionStart;
+            this.selectionEnd = selectionEnd;
+        }
+    }
+
+    static final class ImeStateUpdateTracker {
+        private int batchEditDepth;
+        private boolean updatePending;
+
+        void beginBatchEdit() {
+            batchEditDepth++;
+        }
+
+        boolean isInBatchEdit() {
+            return batchEditDepth > 0;
+        }
+
+        boolean endBatchEdit() {
+            if (batchEditDepth == 0) return false;
+            batchEditDepth--;
+            if (batchEditDepth > 0 || !updatePending) return false;
+            updatePending = false;
+            return true;
+        }
+
+        boolean requestUpdate() {
+            if (batchEditDepth == 0) return true;
+            updatePending = true;
+            return false;
+        }
+
+        void reset() {
+            batchEditDepth = 0;
+            updatePending = false;
+        }
+    }
+
     static int getInputType(boolean terminalSelected, boolean swipeTypingEnabled,
                             boolean enforceCharBasedInput) {
         if (!terminalSelected) {
@@ -31,6 +81,15 @@ final class TerminalImeUtils {
 
     static int getImeOptions() {
         return EditorInfo.IME_FLAG_NO_FULLSCREEN;
+    }
+
+    static ExtractedTextSnapshot getExtractedTextSnapshot(CharSequence text, int selectionStart,
+                                                          int selectionEnd) {
+        String snapshotText = text == null ? "" : text.toString();
+        int fallbackSelection = snapshotText.length();
+        return new ExtractedTextSnapshot(snapshotText,
+            normalizeEditorIndex(selectionStart, snapshotText.length(), fallbackSelection),
+            normalizeEditorIndex(selectionEnd, snapshotText.length(), fallbackSelection));
     }
 
     static int getTerminalDeleteCount(int requestedLength, int bufferedLength,
@@ -76,5 +135,10 @@ final class TerminalImeUtils {
     private static int getCount(CharSequence text, int start, int end, boolean codePoints) {
         if (text == null || end <= start) return 0;
         return codePoints ? Character.codePointCount(text, start, end) : end - start;
+    }
+
+    private static int normalizeEditorIndex(int index, int textLength, int fallback) {
+        if (index < 0) return fallback;
+        return Math.min(index, textLength);
     }
 }

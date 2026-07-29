@@ -38,6 +38,55 @@ public class TerminalImeUtilsTest {
     }
 
     @Test
+    public void extractedTextSnapshotDescribesBufferedComposition() {
+        TerminalImeUtils.ExtractedTextSnapshot snapshot =
+            TerminalImeUtils.getExtractedTextSnapshot("swiping", 2, 7);
+
+        Assert.assertEquals("swiping", snapshot.text);
+        Assert.assertEquals(0, snapshot.startOffset);
+        Assert.assertEquals(-1, snapshot.partialStartOffset);
+        Assert.assertEquals(-1, snapshot.partialEndOffset);
+        Assert.assertEquals(2, snapshot.selectionStart);
+        Assert.assertEquals(7, snapshot.selectionEnd);
+    }
+
+    @Test
+    public void extractedTextSnapshotNormalizesUnavailableSelection() {
+        TerminalImeUtils.ExtractedTextSnapshot snapshot =
+            TerminalImeUtils.getExtractedTextSnapshot("swipe", -1, 20);
+
+        Assert.assertEquals(5, snapshot.selectionStart);
+        Assert.assertEquals(5, snapshot.selectionEnd);
+    }
+
+    @Test
+    public void imeStateUpdatesAreDeferredUntilOutermostBatchEnds() {
+        TerminalImeUtils.ImeStateUpdateTracker tracker =
+            new TerminalImeUtils.ImeStateUpdateTracker();
+
+        Assert.assertTrue(tracker.requestUpdate());
+        tracker.beginBatchEdit();
+        tracker.beginBatchEdit();
+        Assert.assertFalse(tracker.requestUpdate());
+        Assert.assertFalse(tracker.endBatchEdit());
+        Assert.assertTrue(tracker.endBatchEdit());
+        Assert.assertFalse(tracker.isInBatchEdit());
+    }
+
+    @Test
+    public void resetDiscardsPendingImeStateUpdate() {
+        TerminalImeUtils.ImeStateUpdateTracker tracker =
+            new TerminalImeUtils.ImeStateUpdateTracker();
+
+        tracker.beginBatchEdit();
+        Assert.assertFalse(tracker.requestUpdate());
+        tracker.reset();
+
+        Assert.assertFalse(tracker.isInBatchEdit());
+        Assert.assertFalse(tracker.endBatchEdit());
+    }
+
+    @Test
     public void compositionDeletesBufferedTextBeforeTerminalText() {
         Assert.assertEquals(0, TerminalImeUtils.getTerminalDeleteCount(1, 5, true));
         Assert.assertEquals(2, TerminalImeUtils.getTerminalDeleteCount(4, 2, true));

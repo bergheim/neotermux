@@ -13,6 +13,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.text.Editable;
+import android.text.Selection;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.ActionMode;
@@ -30,8 +31,12 @@ import android.view.autofill.AutofillManager;
 import android.view.autofill.AutofillValue;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.ExtractedText;
+import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.SurroundingText;
+import android.view.inputmethod.TextAttribute;
 import android.widget.Scroller;
 
 import androidx.annotation.Nullable;
@@ -52,6 +57,7 @@ public final class TerminalView extends View {
     public TerminalSession mTermSession;
     /** Our terminal emulator whose session is {@link #mTermSession}. */
     public TerminalEmulator mEmulator;
+    private long mInputConnectionGeneration;
 
     public TerminalRenderer mRenderer;
 
@@ -340,6 +346,7 @@ public final class TerminalView extends View {
         boolean terminalSelected = mClient.isTerminalViewSelected();
         boolean swipeTypingEnabled = terminalSelected && mClient.shouldUseSwipeTyping();
         final TerminalSession inputSession = mTermSession;
+        final long inputConnectionGeneration = ++mInputConnectionGeneration;
 
         // Ensure that inputType is only set if TerminalView is selected view with the keyboard and
         // an alternate view is not selected, like an EditText. This is necessary if an activity is
@@ -353,25 +360,132 @@ public final class TerminalView extends View {
         outAttrs.imeOptions = TerminalImeUtils.getImeOptions();
         outAttrs.initialSelStart = 0;
         outAttrs.initialSelEnd = 0;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            outAttrs.setInitialSurroundingText("");
+        }
+
+        final InputMethodManager inputMethodManager = (InputMethodManager)
+            getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
 
         return new BaseInputConnection(this, true) {
 
+            private ExtractedTextRequest extractedTextMonitorRequest;
+            private final TerminalImeUtils.ImeStateUpdateTracker imeStateUpdateTracker =
+                new TerminalImeUtils.ImeStateUpdateTracker();
+            private boolean closed;
+
             @Override
             public boolean sendKeyEvent(KeyEvent event) {
-                if (inputSession == null || inputSession != mTermSession || mEmulator == null)
-                    return false;
+                if (!isInputSessionCurrent() || mEmulator == null) return false;
                 return super.sendKeyEvent(event);
+            }
+
+            @Override
+            public boolean beginBatchEdit() {
+                if (!isInputSessionCurrent()) return false;
+                imeStateUpdateTracker.beginBatchEdit();
+                return true;
+            }
+
+            @Override
+            public boolean endBatchEdit() {
+                if (!isInputSessionCurrent() || !imeStateUpdateTracker.isInBatchEdit()) {
+                    return false;
+                }
+                if (imeStateUpdateTracker.endBatchEdit()) dispatchImeState();
+                return imeStateUpdateTracker.isInBatchEdit();
+            }
+
+            @Override
+            @TargetApi(Build.VERSION_CODES.N)
+            public void closeConnection() {
+                if (closed) return;
+
+                Editable content = getEditable();
+                if (content != null) {
+                    BaseInputConnection.removeComposingSpans(content);
+                    content.clear();
+                }
+                closed = true;
+                extractedTextMonitorRequest = null;
+                imeStateUpdateTracker.reset();
+            }
+
+            @Override
+            public ExtractedText getExtractedText(ExtractedTextRequest request, int flags) {
+                if (!isInputSessionCurrent() || request == null) return null;
+                if ((flags & InputConnection.GET_EXTRACTED_TEXT_MONITOR) != 0) {
+                    extractedTextMonitorRequest = request;
+                }
+                return createExtractedText(request);
+            }
+
+            @Override
+            public CharSequence getTextBeforeCursor(int length, int flags) {
+                if (!isInputSessionCurrent()) return null;
+                return super.getTextBeforeCursor(length, flags);
+            }
+
+            @Override
+            public CharSequence getTextAfterCursor(int length, int flags) {
+                if (!isInputSessionCurrent()) return null;
+                return super.getTextAfterCursor(length, flags);
+            }
+
+            @Override
+            public CharSequence getSelectedText(int flags) {
+                if (!isInputSessionCurrent()) return null;
+                return super.getSelectedText(flags);
+            }
+
+            @Override
+            public int getCursorCapsMode(int reqModes) {
+                if (!isInputSessionCurrent()) return 0;
+                return super.getCursorCapsMode(reqModes);
+            }
+
+            @Override
+            @TargetApi(Build.VERSION_CODES.S)
+            public SurroundingText getSurroundingText(int beforeLength, int afterLength, int flags) {
+                if (!isInputSessionCurrent()) return null;
+                return super.getSurroundingText(beforeLength, afterLength, flags);
+            }
+
+            @Override
+            public boolean setComposingText(CharSequence text, int newCursorPosition) {
+                if (!isInputSessionCurrent()) return false;
+                boolean result = super.setComposingText(text, newCursorPosition);
+                updateImeState();
+                return result;
+            }
+
+            @Override
+            public boolean setComposingRegion(int start, int end) {
+                if (!isInputSessionCurrent()) return false;
+                boolean result = super.setComposingRegion(start, end);
+                updateImeState();
+                return result;
+            }
+
+            @Override
+            public boolean setSelection(int start, int end) {
+                if (!isInputSessionCurrent()) return false;
+                boolean result = super.setSelection(start, end);
+                updateImeState();
+                return result;
             }
 
             @Override
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
+                if (!isInputSessionCurrent()) return false;
                 // BaseInputConnection removes the composing span but keeps its text in the editable.
                 super.finishComposingText();
 
                 Editable content = getEditable();
                 sendTextToTerminal(content);
                 content.clear();
+                updateImeState();
                 return true;
             }
 
@@ -380,12 +494,33 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: commitText(\"" + text + "\", " + newCursorPosition + ")");
                 }
+                if (!isInputSessionCurrent()) return false;
                 // This replaces any composing span, leaving the complete commit in the editable.
                 super.commitText(text, newCursorPosition);
 
                 Editable content = getEditable();
                 sendTextToTerminal(content);
                 content.clear();
+                updateImeState();
+                return true;
+            }
+
+            @Override
+            @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+            public boolean replaceText(int start, int end, CharSequence text,
+                                       int newCursorPosition, TextAttribute textAttribute) {
+                if (!isInputSessionCurrent() || start < 0 || end < 0) return false;
+
+                beginBatchEdit();
+                Editable content = getEditable();
+                BaseInputConnection.removeComposingSpans(content);
+                int replacementStart = Math.min(Math.min(start, end), content.length());
+                int replacementEnd = Math.min(Math.max(start, end), content.length());
+                content.replace(replacementStart, replacementEnd, text);
+                sendTextToTerminal(content);
+                content.clear();
+                updateImeState();
+                endBatchEdit();
                 return true;
             }
 
@@ -394,9 +529,10 @@ public final class TerminalView extends View {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingText(" + leftLength + ", " + rightLength + ")");
                 }
+                if (!isInputSessionCurrent()) return false;
                 Editable content = getEditable();
-                int selectionStart = content == null ? -1 : android.text.Selection.getSelectionStart(content);
-                int selectionEnd = content == null ? -1 : android.text.Selection.getSelectionEnd(content);
+                int selectionStart = content == null ? -1 : Selection.getSelectionStart(content);
+                int selectionEnd = content == null ? -1 : Selection.getSelectionEnd(content);
                 int composingStart = content == null ? -1 : BaseInputConnection.getComposingSpanStart(content);
                 int composingEnd = content == null ? -1 : BaseInputConnection.getComposingSpanEnd(content);
                 int bufferedBefore = TerminalImeUtils.getBufferedCountBeforeDelete(content,
@@ -411,7 +547,9 @@ public final class TerminalView extends View {
                     sendDeleteKeyEvents(KeyEvent.KEYCODE_FORWARD_DEL,
                         TerminalImeUtils.getTerminalDeleteCount(rightLength, bufferedAfter, true));
                 }
-                return super.deleteSurroundingText(leftLength, rightLength);
+                boolean result = super.deleteSurroundingText(leftLength, rightLength);
+                updateImeState();
+                return result;
             }
 
             @Override
@@ -421,9 +559,10 @@ public final class TerminalView extends View {
                     mClient.logInfo(LOG_TAG, "IME: deleteSurroundingTextInCodePoints(" +
                         leftLength + ", " + rightLength + ")");
                 }
+                if (!isInputSessionCurrent()) return false;
                 Editable content = getEditable();
-                int selectionStart = content == null ? -1 : android.text.Selection.getSelectionStart(content);
-                int selectionEnd = content == null ? -1 : android.text.Selection.getSelectionEnd(content);
+                int selectionStart = content == null ? -1 : Selection.getSelectionStart(content);
+                int selectionEnd = content == null ? -1 : Selection.getSelectionEnd(content);
                 int composingStart = content == null ? -1 : BaseInputConnection.getComposingSpanStart(content);
                 int composingEnd = content == null ? -1 : BaseInputConnection.getComposingSpanEnd(content);
                 int bufferedBefore = TerminalImeUtils.getBufferedCountBeforeDelete(content,
@@ -439,7 +578,63 @@ public final class TerminalView extends View {
                 }
                 // The platform implementation deletes code points directly; it does not delegate
                 // to deleteSurroundingText(), so terminal backspaces are not dispatched twice.
-                return super.deleteSurroundingTextInCodePoints(leftLength, rightLength);
+                boolean result = super.deleteSurroundingTextInCodePoints(leftLength, rightLength);
+                updateImeState();
+                return result;
+            }
+
+            boolean isInputSessionCurrent() {
+                return !closed && inputSession != null && inputSession == mTermSession &&
+                    inputConnectionGeneration == mInputConnectionGeneration;
+            }
+
+            ExtractedText createExtractedText(ExtractedTextRequest request) {
+                Editable content = getEditable();
+                TerminalImeUtils.ExtractedTextSnapshot snapshot =
+                    TerminalImeUtils.getExtractedTextSnapshot(content,
+                        content == null ? -1 : Selection.getSelectionStart(content),
+                        content == null ? -1 : Selection.getSelectionEnd(content));
+
+                ExtractedText extractedText = new ExtractedText();
+                if (content != null &&
+                    (request.flags & InputConnection.GET_TEXT_WITH_STYLES) != 0) {
+                    extractedText.text = content.subSequence(0, content.length());
+                } else {
+                    extractedText.text = snapshot.text;
+                }
+                extractedText.startOffset = snapshot.startOffset;
+                extractedText.partialStartOffset = snapshot.partialStartOffset;
+                extractedText.partialEndOffset = snapshot.partialEndOffset;
+                extractedText.selectionStart = snapshot.selectionStart;
+                extractedText.selectionEnd = snapshot.selectionEnd;
+                extractedText.flags = 0;
+                return extractedText;
+            }
+
+            void updateImeState() {
+                if (!isInputSessionCurrent() || !imeStateUpdateTracker.requestUpdate()) return;
+                dispatchImeState();
+            }
+
+            void dispatchImeState() {
+                if (!isInputSessionCurrent() || inputMethodManager == null) return;
+
+                Editable content = getEditable();
+                TerminalImeUtils.ExtractedTextSnapshot snapshot =
+                    TerminalImeUtils.getExtractedTextSnapshot(content,
+                        content == null ? -1 : Selection.getSelectionStart(content),
+                        content == null ? -1 : Selection.getSelectionEnd(content));
+                int composingStart = content == null ? -1 :
+                    BaseInputConnection.getComposingSpanStart(content);
+                int composingEnd = content == null ? -1 :
+                    BaseInputConnection.getComposingSpanEnd(content);
+                inputMethodManager.updateSelection(TerminalView.this, snapshot.selectionStart,
+                    snapshot.selectionEnd, composingStart, composingEnd);
+                if (extractedTextMonitorRequest != null) {
+                    inputMethodManager.updateExtractedText(TerminalView.this,
+                        extractedTextMonitorRequest.token,
+                        createExtractedText(extractedTextMonitorRequest));
+                }
             }
 
             void sendDeleteKeyEvents(int keyCode, int count) {
@@ -450,7 +645,7 @@ public final class TerminalView extends View {
             void sendTextToTerminal(CharSequence text) {
                 // A closing connection may outlive a session switch. Never inject its buffered
                 // composition into the terminal session that replaced the one it was created for.
-                if (inputSession == null || inputSession != mTermSession || mEmulator == null) return;
+                if (!isInputSessionCurrent() || mEmulator == null) return;
 
                 stopTextSelectionMode();
                 final int textLengthInChars = text.length();

@@ -12,8 +12,13 @@ CLOSED: [2026-07-28 Tue 17:03]
 :END:
 Implement a swipe-capable composing IME mode enabled by default, retain raw terminal input as a settings fallback, and verify terminal input regressions.
 
-* INPROGRESS Activate CI/CD for Neotermux APK delivery  :autonomous:
+* DONE Activate CI/CD for Neotermux APK delivery                 :autonomous:
+CLOSED: [2026-07-29 Wed 11:15]
 :PROPERTIES:
 :ID:       20260729T110216Z-46ad3d
+:END:
+:LOGBOOK:
+- State "DONE"       from "INPROGRESS" [2026-07-29 Wed 11:15] \\
+  Created the standalone bergheim/neotermux repository, enabled dependency security data, protected master, and verified wrapper validation, full unit tests, both APK build matrices, downloadable artifacts, and dependency submission on GitHub Actions.
 :END:
 Enable fork workflows, run validation for pull requests, publish installable APK artifacts, and verify the GitHub run.

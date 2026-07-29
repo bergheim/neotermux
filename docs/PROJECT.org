@@ -31,6 +31,8 @@ Recent modernization work:
 - Added development tooling and project configuration.
 - Renamed development builds to Neotermux and changed the application id to
   =dev.bergheim.neotermux= for side-by-side installation with Termux.
+- Created =https://github.com/bergheim/neotermux= as the standalone delivery
+  repository so Neotermux CI/CD runs independently of upstream fork controls.
 
 The upstream app package id is =com.termux=. The app repository remains separate
 from =termux/termux-packages=.
@@ -83,6 +85,10 @@ Use =just --list= as the command menu.
 =just test= and =just run= currently exist as placeholders. Android behavior
 changes require Gradle checks when a Java/Android SDK is available and manual
 device checks with Gboard or another swipe-capable IME.
+
+GitHub Actions validates pull requests, runs unit tests, and publishes debug APK
+artifacts for both supported package variants. Publishing a semantic-versioned
+GitHub release builds and attaches installable debug APKs plus SHA-256 checksums.
 
 * Documentation
 

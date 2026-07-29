@@ -11,3 +11,9 @@ CLOSED: [2026-07-28 Tue 17:03]
   Implemented in commits f22c8839, 0d32b5b5, and 2483639f. Focused terminal-view tests and full debug APK assembly pass; real-device Gboard verification remains the final product check.
 :END:
 Implement a swipe-capable composing IME mode enabled by default, retain raw terminal input as a settings fallback, and verify terminal input regressions.
+
+* INPROGRESS Activate CI/CD for Neotermux APK delivery  :autonomous:
+:PROPERTIES:
+:ID:       20260729T110216Z-46ad3d
+:END:
+Enable fork workflows, run validation for pull requests, publish installable APK artifacts, and verify the GitHub run.

@@ -8,6 +8,14 @@ on:
   pull_request:
     branches:
       - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -26,6 +34,7 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Build APKs
         shell: bash {0}
@@ -88,6 +97,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_universal
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_universal.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
@@ -96,6 +106,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_arm64-v8a.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
@@ -104,6 +115,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_armeabi-v7a
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_armeabi-v7a.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
@@ -112,6 +124,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_x86_64
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_x86_64.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
@@ -120,6 +133,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_x86
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_x86.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
@@ -128,6 +142,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ${{ env.APK_BASENAME_PREFIX }}_sha256sums
+          retention-days: 14
           path: |
             ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_sha256sums
             ${{ env.APK_DIR_PATH }}/output-metadata.json

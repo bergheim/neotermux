@@ -350,7 +350,7 @@ public final class TerminalView extends View {
 
         // Note that IME_ACTION_NONE cannot be used as that makes it impossible to input newlines using the on-screen
         // keyboard on Android TV (see https://github.com/termux/termux-app/issues/221).
-        outAttrs.imeOptions = TerminalImeUtils.getImeOptions(swipeTypingEnabled, Build.VERSION.SDK_INT);
+        outAttrs.imeOptions = TerminalImeUtils.getImeOptions();
         outAttrs.initialSelStart = 0;
         outAttrs.initialSelEnd = 0;
 

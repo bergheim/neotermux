@@ -1,6 +1,5 @@
 package com.termux.view;
 
-import android.os.Build;
 import android.text.InputType;
 import android.view.inputmethod.EditorInfo;
 
@@ -30,12 +29,8 @@ final class TerminalImeUtils {
         return InputType.TYPE_NULL;
     }
 
-    static int getImeOptions(boolean swipeTypingEnabled, int sdkInt) {
-        int options = EditorInfo.IME_FLAG_NO_FULLSCREEN;
-        if (swipeTypingEnabled && sdkInt >= Build.VERSION_CODES.O) {
-            options |= EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING;
-        }
-        return options;
+    static int getImeOptions() {
+        return EditorInfo.IME_FLAG_NO_FULLSCREEN;
     }
 
     static int getTerminalDeleteCount(int requestedLength, int bufferedLength,

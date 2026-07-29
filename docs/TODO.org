@@ -1,12 +1,12 @@
 #+title: Tasks
 #+date: [2026-07-28 Tue]
 
-* DONE Enable swipe typing in the terminal                       :autonomous:
-CLOSED: [2026-07-28 Tue 17:03]
+* INPROGRESS Enable swipe typing in the terminal                 :autonomous:
 :PROPERTIES:
 :ID:       20260728T164500Z-88a60f
 :END:
 :LOGBOOK:
+- State "INPROGRESS" from "DONE"       [2026-07-29 Wed 12:02]
 - State "DONE"       from "INPROGRESS" [2026-07-28 Tue 17:03] \\
   Implemented in commits f22c8839, 0d32b5b5, and 2483639f. Focused terminal-view tests and full debug APK assembly pass; real-device Gboard verification remains the final product check.
 :END:

@@ -1,6 +1,5 @@
 package com.termux.view;
 
-import android.os.Build;
 import android.text.InputType;
 import android.view.inputmethod.EditorInfo;
 
@@ -31,13 +30,11 @@ public class TerminalImeUtilsTest {
     }
 
     @Test
-    public void swipeTypingRequestsNoPersonalizedLearningWhenSupported() {
-        int options = TerminalImeUtils.getImeOptions(true, Build.VERSION_CODES.O);
+    public void swipeTypingAllowsPredictionDependentKeyboards() {
+        int options = TerminalImeUtils.getImeOptions();
 
         Assert.assertTrue((options & EditorInfo.IME_FLAG_NO_FULLSCREEN) != 0);
-        Assert.assertTrue((options & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0);
-        Assert.assertEquals(EditorInfo.IME_FLAG_NO_FULLSCREEN,
-            TerminalImeUtils.getImeOptions(true, Build.VERSION_CODES.O - 1));
+        Assert.assertEquals(0, options & EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
     }
 
     @Test

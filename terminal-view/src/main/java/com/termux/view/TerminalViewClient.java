@@ -32,6 +32,10 @@ public interface TerminalViewClient {
 
     boolean shouldEnforceCharBasedInput();
 
+    default boolean shouldUseSwipeTyping() {
+        return false;
+    }
+
     boolean shouldUseCtrlSpaceWorkaround();
 
     boolean isTerminalViewSelected();

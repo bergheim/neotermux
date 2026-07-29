@@ -54,8 +54,11 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
         if (key == null) return;
 
         switch (key) {
+            case "swipe_typing_enabled":
+                mPreferences.setSwipeTypingEnabled(value);
+                break;
             case "soft_keyboard_enabled":
-                    mPreferences.setSoftKeyboardEnabled(value);
+                mPreferences.setSoftKeyboardEnabled(value);
                 break;
             case "soft_keyboard_enabled_only_if_no_hardware":
                 mPreferences.setSoftKeyboardEnabledOnlyIfNoHardware(value);
@@ -70,6 +73,8 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
         if (mPreferences == null) return false;
 
         switch (key) {
+            case "swipe_typing_enabled":
+                return mPreferences.isSwipeTypingEnabled();
             case "soft_keyboard_enabled":
                 return mPreferences.isSoftKeyboardEnabled();
             case "soft_keyboard_enabled_only_if_no_hardware":

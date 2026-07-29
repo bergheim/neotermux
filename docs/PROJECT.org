@@ -1,0 +1,98 @@
+#+title: Project
+#+date: [2026-07-28 Tue]
+
+* Purpose
+
+This repository is a modernization fork of the Termux Android application,
+branded as Neotermux for development builds.
+
+The goal is to improve the mobile terminal experience while preserving the
+core Termux model: an Android terminal app and Linux environment. This repo owns
+the app UI, terminal view, terminal emulator integration, Android shell
+environment glue, shared app utilities, and build packaging. It does not own the
+Termux package repository or package recipes installed inside the app.
+
+Modernization work should make Termux feel better on current Android devices,
+especially around touch interaction, scrolling, keyboard ergonomics, tooling,
+and maintainability.
+
+* Audience
+
+- Android users who rely on Termux as a real terminal environment.
+- Developers and power users who expect terminal behavior to remain predictable.
+- Users writing natural-language prompts with swipe-capable Android keyboards.
+- Contributors and AI coding agents working on the Android/Java codebase.
+
+* Current State
+
+Recent modernization work:
+
+- Added per-pixel scrolling to the scrollback view.
+- Added development tooling and project configuration.
+- Renamed development builds to Neotermux and changed the application id to
+  =dev.bergheim.neotermux= for side-by-side installation with Termux.
+- Created =https://github.com/bergheim/neotermux= as the standalone delivery
+  repository so Neotermux CI/CD runs independently of upstream fork controls.
+
+The upstream app package id is =com.termux=. The app repository remains separate
+from =termux/termux-packages=.
+
+* Architecture
+
+- =app=: Android activity, settings, session UI, toolbar, and app-specific input.
+- =terminal-view=: terminal rendering, touch handling, IME input, key events,
+  mouse events, scrollback, and text selection.
+- =terminal-emulator=: terminal emulation and native terminal integration.
+- =termux-shared=: shared settings, properties, extra keys, and utilities.
+
+Keyboard work commonly touches:
+
+- =terminal-view/src/main/java/com/termux/view/TerminalView.java=
+- =terminal-view/src/main/java/com/termux/view/TerminalViewClient.java=
+- =app/src/main/java/com/termux/app/terminal/TermuxTerminalViewClient.java=
+- =termux-shared/src/main/java/com/termux/shared/termux/settings/preferences/=
+
+* Constraints
+
+- Preserve escape sequences, modifiers, alternate-screen apps, mouse tracking,
+  text selection, copy/paste, scrollback, and Unicode input.
+- Android IMEs own swipe recognition. Neotermux must expose a compatible editor
+  connection and correctly forward the IME's committed text.
+- A terminal cannot reliably detect password prompts. Predictive input may let
+  the selected keyboard process or retain sensitive text, so raw input must
+  remain available and the setting must explain the tradeoff.
+- General vertical swipes on the terminal remain scrollback or terminal-app
+  interaction and are separate from keyboard swipe typing.
+- Keep behavior compatible with upstream Termux structure where practical.
+
+* Keyboard Input Decision
+
+Swipe typing is a first-class Neotermux requirement because terminal use now
+includes writing long natural-language prompts.
+
+Neotermux should present the terminal as a normal composing text editor when
+swipe typing is enabled. The default is swipe-capable input. Users can disable
+it in Terminal I/O settings to restore raw Termux input for sensitive prompts,
+control-key-heavy programs, or incompatible keyboards.
+
+IME composition stays inside Android's input connection until text is committed.
+Committed text is then sent through the existing terminal code-point path.
+
+* Development
+
+Use =just --list= as the command menu.
+
+=just test= and =just run= currently exist as placeholders. Android behavior
+changes require Gradle checks when a Java/Android SDK is available and manual
+device checks with Gboard or another swipe-capable IME.
+
+GitHub Actions validates pull requests, runs unit tests, and publishes debug APK
+artifacts for both supported package variants. Publishing a semantic-versioned
+GitHub release builds and attaches installable debug APKs plus SHA-256 checksums.
+
+* Documentation
+
+- =docs/PROJECT.org= holds stable project context and decisions.
+- =docs/TODO.org= is the active work log.
+- Repo discoveries belong in =docs/notes= using denote filenames.
+- Cross-project or host-level discoveries belong in =/workspaces/stash/notes=.

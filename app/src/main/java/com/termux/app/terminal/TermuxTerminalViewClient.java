@@ -69,6 +69,8 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
     private boolean mTerminalCursorBlinkerStateAlreadySet;
 
+    private Boolean mLastSwipeTypingEnabled;
+
     private List<KeyboardShortcut> mSessionShortcuts;
 
     private static final String LOG_TAG = "TermuxTerminalViewClient";
@@ -90,6 +92,7 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
 
         mActivity.getTerminalView().setTextSize(mActivity.getPreferences().getFontSize());
         mActivity.getTerminalView().setKeepScreenOn(mActivity.getPreferences().shouldKeepScreenOn());
+        mLastSwipeTypingEnabled = shouldUseSwipeTyping();
     }
 
     /**
@@ -104,6 +107,11 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
         // Piggyback on the terminal view key logging toggle for now, should add a separate toggle in future
         mActivity.getTermuxActivityRootView().setIsRootViewLoggingEnabled(isTerminalViewKeyLoggingEnabled);
         ViewUtils.setIsViewUtilsLoggingEnabled(isTerminalViewKeyLoggingEnabled);
+
+        boolean swipeTypingEnabled = shouldUseSwipeTyping();
+        if (mLastSwipeTypingEnabled != null && mLastSwipeTypingEnabled != swipeTypingEnabled)
+            KeyboardUtils.restartInput(mActivity, mActivity.getTerminalView());
+        mLastSwipeTypingEnabled = swipeTypingEnabled;
     }
 
     /**
@@ -214,6 +222,21 @@ public class TermuxTerminalViewClient extends TermuxTerminalViewClientBase {
     @Override
     public boolean shouldEnforceCharBasedInput() {
         return mActivity.getProperties().isEnforcingCharBasedInput();
+    }
+
+    @Override
+    public boolean shouldUseSwipeTyping() {
+        return mActivity.getPreferences().isSwipeTypingEnabled();
+    }
+
+    public void toggleSwipeTyping() {
+        boolean enabled = !shouldUseSwipeTyping();
+        mActivity.getPreferences().setSwipeTypingEnabled(enabled);
+        mLastSwipeTypingEnabled = enabled;
+        KeyboardUtils.restartInput(mActivity, mActivity.getTerminalView());
+        Logger.showToast(mActivity, mActivity.getString(enabled
+            ? R.string.msg_swipe_typing_enabled
+            : R.string.msg_swipe_typing_disabled), false);
     }
 
     @Override

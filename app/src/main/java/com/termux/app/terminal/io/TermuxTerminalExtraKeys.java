@@ -100,6 +100,9 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             TerminalView terminalView = mTermuxTerminalViewClient.getActivity().getTerminalView();
             if (terminalView != null && terminalView.mEmulator != null)
                 terminalView.mEmulator.toggleAutoScrollDisabled();
+        } else if ("NEOTERMUX_INPUT_MODE".equals(key)) {
+            if (mTermuxTerminalViewClient != null)
+                mTermuxTerminalViewClient.toggleSwipeTyping();
         } else {
             super.onTerminalExtraKeyButtonClick(view, key, ctrlDown, altDown, shiftDown, fnDown);
         }

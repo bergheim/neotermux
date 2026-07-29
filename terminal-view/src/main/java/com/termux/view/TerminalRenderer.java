@@ -53,11 +53,18 @@ public final class TerminalRenderer {
         }
     }
 
-    /** Render the terminal to a canvas with at a specified row scroll, and an optional rectangular selection. */
-    public final void render(TerminalEmulator mEmulator, Canvas canvas, int topRow,
+    /** Render the terminal to a canvas with at a specified row scroll, and an optional rectangular selection.
+     *
+     * pixelYOffset is in [0, mFontLineSpacing) and shifts the rendered content upward so that the
+     * top edge of row {@code topRow} is partially clipped above the viewport — this enables sub-row
+     * (per-pixel) scrolling. When non-zero, one extra row is rendered at the bottom so the row
+     * partially entering the viewport is drawn.
+     */
+    public final void render(TerminalEmulator mEmulator, Canvas canvas, int topRow, int pixelYOffset,
                              int selectionY1, int selectionY2, int selectionX1, int selectionX2) {
         final boolean reverseVideo = mEmulator.isReverseVideo();
-        final int endRow = topRow + mEmulator.mRows;
+        final int extraRow = pixelYOffset > 0 ? 1 : 0;
+        final int endRow = topRow + mEmulator.mRows + extraRow;
         final int columns = mEmulator.mColumns;
         final int cursorCol = mEmulator.getCursorCol();
         final int cursorRow = mEmulator.getCursorRow();
@@ -68,6 +75,12 @@ public final class TerminalRenderer {
 
         if (reverseVideo)
             canvas.drawColor(palette[TextStyle.COLOR_INDEX_FOREGROUND], PorterDuff.Mode.SRC);
+
+        final boolean translated = pixelYOffset != 0;
+        if (translated) {
+            canvas.save();
+            canvas.translate(0, -pixelYOffset);
+        }
 
         float heightOffset = mFontLineSpacingAndAscent;
         for (int row = topRow; row < endRow; row++) {
@@ -154,6 +167,8 @@ public final class TerminalRenderer {
             drawTextRun(canvas, line, palette, heightOffset, lastRunStartColumn, columnWidthSinceLastRun, lastRunStartIndex, charsSinceLastRun,
                 measuredWidthForRun, cursorColor, cursorShape, lastRunStyle, reverseVideo || invertCursorTextColor || lastRunInsideSelection);
         }
+
+        if (translated) canvas.restore();
     }
 
     private void drawTextRun(Canvas canvas, char[] text, int[] palette, float y, int startColumn, int runWidthColumns,

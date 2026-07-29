@@ -110,6 +110,15 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_SOFT_KEYBOARD_ENABLED_ONLY_IF_NO_HARDWARE, value, false);
     }
 
+    public boolean isSwipeTypingEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_SWIPE_TYPING_ENABLED,
+            TERMUX_APP.DEFAULT_VALUE_SWIPE_TYPING_ENABLED);
+    }
+
+    public void setSwipeTypingEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_SWIPE_TYPING_ENABLED, value, false);
+    }
+
 
 
     public boolean shouldKeepScreenOn() {

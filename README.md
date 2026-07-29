@@ -1,13 +1,33 @@
-# Termux application
+# Neotermux
 
-[![Build status](https://github.com/termux/termux-app/workflows/Build/badge.svg)](https://github.com/termux/termux-app/actions)
-[![Testing status](https://github.com/termux/termux-app/workflows/Unit%20tests/badge.svg)](https://github.com/termux/termux-app/actions)
-[![Join the chat at https://gitter.im/termux/termux](https://badges.gitter.im/termux/termux.svg)](https://gitter.im/termux/termux)
-[![Join the Termux discord server](https://img.shields.io/discord/641256914684084234.svg?label=&logo=discord&logoColor=ffffff&color=5865F2)](https://discord.gg/HXpF69X)
-[![Termux library releases at Jitpack](https://jitpack.io/v/termux/termux-app.svg)](https://jitpack.io/#termux/termux-app)
+[![Build status](https://github.com/bergheim/neotermux/actions/workflows/debug_build.yml/badge.svg)](https://github.com/bergheim/neotermux/actions/workflows/debug_build.yml)
+[![Testing status](https://github.com/bergheim/neotermux/actions/workflows/run_tests.yml/badge.svg)](https://github.com/bergheim/neotermux/actions/workflows/run_tests.yml)
 
+Neotermux is a modernization fork of the
+[Termux Android application](https://github.com/termux/termux-app). It focuses
+on current mobile-terminal workflows while preserving Termux terminal and shell
+compatibility.
 
-[Termux](https://termux.dev) is an Android terminal application and Linux environment.
+Current improvements include:
+
+- Swipe and predictive keyboard input enabled by default.
+- A raw-input fallback for sensitive prompts and incompatible keyboards.
+- Per-pixel scrollback for smoother touch interaction.
+- The `dev.bergheim.neotermux` application id for side-by-side installation
+  with Termux.
+
+Pull requests run wrapper validation, unit tests, and APK builds for both
+supported package variants. Installable debug APKs are available from each
+successful [Build workflow](https://github.com/bergheim/neotermux/actions/workflows/debug_build.yml)
+and from GitHub Releases. Workflow artifacts require a GitHub login.
+
+These builds use a public test key and are intended for development and testing,
+not trusted production distribution.
+
+## Upstream Termux documentation
+
+[Termux](https://termux.dev) is an Android terminal application and Linux
+environment.
 
 Note that this repository is for the app itself (the user interface and the terminal emulation). For the packages installable inside the app, see [termux/termux-packages](https://github.com/termux/termux-packages).
 
@@ -271,25 +291,25 @@ Commit messages **must** use the [Conventional Commits](https://www.conventional
 
 ## Sponsors and Funders
 
-[<img alt="GitHub Accelerator" width="25%" src="site/assets/sponsors/github.png" />](https://github.com)  
+[<img alt="GitHub Accelerator" width="25%" src="site/assets/sponsors/github.png" />](https://github.com)
 *[GitHub Accelerator](https://github.com/accelerator) ([1](https://github.blog/2023-04-12-github-accelerator-our-first-cohort-and-whats-next))*
 
 &nbsp;
 
-[<img alt="GitHub Secure Open Source Fund" width="25%" src="site/assets/sponsors/github.png" />](https://github.com)  
+[<img alt="GitHub Secure Open Source Fund" width="25%" src="site/assets/sponsors/github.png" />](https://github.com)
 *[GitHub Secure Open Source Fund](https://resources.github.com/github-secure-open-source-fund) ([1](https://github.blog/open-source/maintainers/securing-the-supply-chain-at-scale-starting-with-71-important-open-source-projects), [2](https://termux.dev/en/posts/general/2025/08/11/termux-selected-for-github-secure-open-source-fund-session-2.html))*
 
 &nbsp;
 
-[<img alt="NLnet NGI Mobifree" width="25%" src="site/assets/sponsors/nlnet-ngi-mobifree.png" />](https://nlnet.nl/mobifree)  
+[<img alt="NLnet NGI Mobifree" width="25%" src="site/assets/sponsors/nlnet-ngi-mobifree.png" />](https://nlnet.nl/mobifree)
 *[NLnet NGI Mobifree](https://nlnet.nl/mobifree) ([1](https://nlnet.nl/news/2024/20241111-NGI-Mobifree-grants.html), [2](https://termux.dev/en/posts/general/2024/11/11/termux-selected-for-nlnet-ngi-mobifree-grant.html))*
 
 &nbsp;
 
-[<img alt="Cloudflare" width="25%" src="site/assets/sponsors/cloudflare.png" />](https://www.cloudflare.com)  
+[<img alt="Cloudflare" width="25%" src="site/assets/sponsors/cloudflare.png" />](https://www.cloudflare.com)
 *[Cloudflare](https://www.cloudflare.com) ([1](https://packages-cf.termux.dev))*
 
 &nbsp;
 
-[<img alt="Warp" width="25%" src="https://github.com/warpdotdev/brand-assets/blob/640dffd347439bbcb535321ab36b7281cf4446c0/Github/Sponsor/Warp-Github-LG-03.png" />](https://www.warp.dev/?utm_source=github&utm_medium=readme&utm_campaign=termux)  
+[<img alt="Warp" width="25%" src="https://github.com/warpdotdev/brand-assets/blob/640dffd347439bbcb535321ab36b7281cf4446c0/Github/Sponsor/Warp-Github-LG-03.png" />](https://www.warp.dev/?utm_source=github&utm_medium=readme&utm_campaign=termux)
 [*Warp, built for coding with multiple AI agents*](https://www.warp.dev/?utm_source=github&utm_medium=readme&utm_campaign=termux)
